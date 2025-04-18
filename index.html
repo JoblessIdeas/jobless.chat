@@ -1,89 +1,78 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>jobless chat</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jobless Chat</title>
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Segoe UI', sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
-      margin: 0; padding: 0;
-      display: flex; flex-direction: column; align-items: center;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      justify-content: center;
     }
-    h1 {
-      margin-top: 2rem; font-size: 2rem; color: white;
+    h1 { font-size: 2rem; margin: 1rem 0; }
+    .tabs { display: flex; gap: 10px; margin-bottom: 1rem; }
+    .tab-btn { padding: 10px 20px; border: none; border-radius: 10px; background-color: #ffe4c4; cursor: pointer; transition: .3s; }
+    .tab-btn.active { background-color: #ffcc99; }
+    .tab-content {
+      display: none;
+      max-width: 600px;
+      background: white;
+      padding: 1rem;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+      text-align: center;
     }
-    #chat {
-      width: 90%; max-width: 600px; background: white;
-      margin: 2rem 0; padding: 1rem; border-radius: 15px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1); height: 400px;
-      overflow-y: auto;
-    }
-    .msg {
-      margin-bottom: 1rem; padding: 0.5rem 1rem;
-      background: #ffe4c4; border-radius: 10px;
-    }
-    #messageForm {
-      display: flex; gap: 10px; width: 90%; max-width: 600px;
-      margin-bottom: 2rem;
-    }
-    input, button {
-      padding: 0.8rem; border: none; border-radius: 10px;
-      font-size: 1rem;
-    }
-    input {
-      flex: 1;
-    }
-    button {
-      background-color: #ffb347; color: white; cursor: pointer;
-    }
-    button:hover {
-      background-color: #ff944d;
-    }
-    .footer {
-      color: white; margin-bottom: 1rem;
-    }
-    #usernamePrompt {
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.6);
-      display: flex; align-items: center; justify-content: center;
-    }
-    #usernameBox {
-      background: white; padding: 2rem; border-radius: 15px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.2); text-align: center;
-    }
-    #usernameBox input {
-      width: 100%; margin-top: 1rem;
-    }
+    .tab-content.active { display: block; }
+    button.action { padding: 10px 20px; font-size: 1rem; border: none; border-radius: 10px; background-color: #ffb347; color: white; cursor: pointer; }
+    button.action:hover { background-color: #ff944d; }
+    .footer { margin-top: 3rem; font-size: 0.9rem; color: white; white-space: pre-line; }
+    .message { margin: 10px 0; padding: 10px; background-color: #f1f1f1; border-radius: 5px; }
+    .message.user { background-color: #ffcc99; }
+    .message.bot { background-color: #e0e0e0; }
   </style>
 </head>
 <body>
-  <div id="usernamePrompt">
-    <div id="usernameBox">
-      <h2>Enter your name</h2>
-      <input type="text" id="usernameInput" placeholder="Your name..." />
-      <button onclick="saveUsername()">Join Chat</button>
-    </div>
+
+  <h1>Jobless Chat</h1>
+  
+  <!-- Kullanıcı Adı Girişi -->
+  <div class="tab-content active" id="usernameTab">
+    <h2>Enter Your Username</h2>
+    <input type="text" id="usernameInput" placeholder="Enter username" />
+    <button class="action" onclick="enterUsername()">Enter</button>
   </div>
 
-  <h1>jobless.chat</h1>
-  <div id="chat"></div>
-  <form id="messageForm" style="display:none">
-    <input type="text" id="msgInput" placeholder="Type a message..." required />
-    <button type="submit">Send</button>
-  </form>
+  <!-- Oda Seçimi -->
+  <div class="tab-content" id="roomsTab">
+    <h2>Select a Chat Room</h2>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="selectRoom('general')">#general</button>
+      <button class="tab-btn" onclick="selectRoom('memes')">#memes</button>
+      <button class="tab-btn" onclick="selectRoom('brainrot')">#brainrot</button>
+    </div>
+    <div id="messages"></div>
+    <input type="text" id="messageInput" placeholder="Type a message..." />
+    <button class="action" onclick="sendMessage()">Send</button>
+  </div>
+
   <div class="footer">created by jobless</div>
 
-  <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-    import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
-
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
+    
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyAtjatcAxXW7WZgIJzJzIwwd_S1ZQbXyTY",
       authDomain: "jobless-chat-e5d92.firebaseapp.com",
+      databaseURL: "https://jobless-chat-e5d92-default-rtdb.firebaseio.com/",
       projectId: "jobless-chat-e5d92",
       storageBucket: "jobless-chat-e5d92.appspot.com",
       messagingSenderId: "1078763608828",
@@ -92,40 +81,60 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    const chatRef = ref(db, "messages");
 
-    const form = document.getElementById("messageForm");
-    const input = document.getElementById("msgInput");
-    const chat = document.getElementById("chat");
+    let username = '';
+    let selectedRoom = 'general';
 
-    let username = "";
-
-    window.saveUsername = () => {
-      const val = document.getElementById("usernameInput").value.trim();
-      if (val) {
-        username = val;
-        document.getElementById("usernamePrompt").style.display = "none";
-        form.style.display = "flex";
+    // Kullanıcı adı girişi
+    function enterUsername() {
+      username = document.getElementById('usernameInput').value;
+      if (username) {
+        document.getElementById('usernameTab').classList.remove('active');
+        document.getElementById('roomsTab').classList.add('active');
       }
-    };
+    }
 
-    form.addEventListener("submit", e => {
-      e.preventDefault();
-      const text = input.value.trim();
-      if (text && username) {
-        push(chatRef, { user: username, text });
-        input.value = "";
+    // Oda seçimi
+    function selectRoom(room) {
+      selectedRoom = room;
+      document.querySelectorAll('.tab-btn').forEach(button => button.classList.remove('active'));
+      document.querySelector(`button[onclick="selectRoom('${room}')"]`).classList.add('active');
+      loadMessages();
+    }
+
+    // Mesaj yükleme
+    function loadMessages() {
+      const messagesRef = ref(db, 'rooms/' + selectedRoom);
+      onValue(messagesRef, (snapshot) => {
+        const messages = snapshot.val();
+        document.getElementById('messages').innerHTML = '';
+        if (messages) {
+          Object.keys(messages).forEach(key => {
+            const msg = messages[key];
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message');
+            messageDiv.classList.add(msg.user === 'bot' ? 'bot' : 'user');
+            messageDiv.innerHTML = `<strong>${msg.user}</strong>: ${msg.text}`;
+            document.getElementById('messages').appendChild(messageDiv);
+          });
+        }
+      });
+    }
+
+    // Mesaj gönderme
+    function sendMessage() {
+      const messageInput = document.getElementById('messageInput');
+      const text = messageInput.value;
+      if (text.trim()) {
+        const messageRef = ref(db, 'rooms/' + selectedRoom + '/' + Date.now());
+        set(messageRef, {
+          user: username || 'Anonymous',
+          text: text
+        });
+        messageInput.value = '';
       }
-    });
-
-    onChildAdded(chatRef, data => {
-      const msg = data.val();
-      const div = document.createElement("div");
-      div.className = "msg";
-      div.innerHTML = `<strong>${msg.user || "Anon"}:</strong> ${msg.text}`;
-      chat.appendChild(div);
-      chat.scrollTop = chat.scrollHeight;
-    });
+    }
   </script>
+
 </body>
 </html>
